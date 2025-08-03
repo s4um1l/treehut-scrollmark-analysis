@@ -41,13 +41,13 @@ def get_db_connection():
 async def dashboard():
     """Serve the interactive dashboard"""
     try:
-        with open("dashboard.html", "r") as f:
+        with open("backend/templates/dashboard.html", "r") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         return HTMLResponse(content="""
         <html><body style="font-family: Arial; text-align: center; padding: 50px;">
         <h1>📊 Instagram Scrollmark Analysis Dashboard</h1>
-        <p>Dashboard template not found. Please ensure dashboard.html exists.</p>
+        <p>Dashboard template not found. Please ensure backend/templates/dashboard.html exists.</p>
         <p><a href="/api/health">Check API Health</a> | <a href="/docs">View API Docs</a></p>
         </body></html>
         """)

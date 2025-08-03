@@ -1,0 +1,91 @@
+{
+  "pipeline_info": {
+    "total_comments_processed": 1000,
+    "total_columns": 27,
+    "processing_timestamp": "2025-08-03T14:14:52.488525",
+    "database_file": "reports/enriched_instagram_data.sqlite"
+  },
+  "data_quality": {
+    "language_distribution": {
+      "en": 580,
+      "unknown": 74,
+      "fi": 27,
+      "af": 26,
+      "it": 22,
+      "tl": 21,
+      "cy": 21,
+      "so": 20,
+      "fr": 19,
+      "nl": 18,
+      "de": 17,
+      "et": 14,
+      "da": 13,
+      "ro": 13,
+      "ca": 12,
+      "pl": 10,
+      "es": 10,
+      "sv": 9,
+      "tr": 9,
+      "no": 9,
+      "sq": 7,
+      "lt": 7,
+      "id": 6,
+      "pt": 6,
+      "cs": 6,
+      "sl": 5,
+      "hu": 5,
+      "sw": 5,
+      "sk": 4,
+      "vi": 2,
+      "hr": 2,
+      "fa": 1
+    },
+    "spam_rate": 0.6,
+    "bot_rate": 0.0,
+    "avg_comment_length": 31.806
+  },
+  "enrichment_results": {
+    "sentiment_distribution": {
+      "neutral": 506,
+      "positive": 427,
+      "negative": 67
+    },
+    "intent_distribution": {
+      "GENERAL": 829,
+      "PRAISE": 95,
+      "QUESTION": 42,
+      "PURCHASE_INTENT": 17,
+      "COMPLAINT": 11,
+      "REQUEST": 6
+    },
+    "retailer_mentions": {
+      "Walmart": 12,
+      "Target": 6,
+      "sam": 4,
+      "target": 3,
+      "walmart": 2,
+      "Ulta": 2,
+      "Amazon": 1,
+      "ULTA": 1
+    },
+    "geo_mentions": {
+      "Canada": 1,
+      "Australia": 1
+    },
+    "product_mention_rate": 6.7,
+    "scent_mention_rate": 5.6000000000000005
+  },
+  "engagement_metrics": {
+    "tag_rate": 34.599999999999994,
+    "avg_emoji_count": 0.69,
+    "question_rate": 4.1000000000000005
+  },
+  "eda_insights": {
+    "total_comments": 1000,
+    "null_comments": "0",
+    "avg_length": 31.806,
+    "total_posts": 129,
+    "peak_hour": "19",
+    "long_tail_posts": "96"
+  }
+}
