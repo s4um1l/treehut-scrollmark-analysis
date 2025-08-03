@@ -1,39 +1,56 @@
 #!/usr/bin/env python3
 """
-📈 INSTAGRAM TREND & SHIFT ANALYSIS
+📈 PARALLELIZED INSTAGRAM TREND & SHIFT ANALYSIS
 Advanced analytics with weekly SoV, risers/fallers, hotspots, and actionable insights
+Optimized for 17k+ comments with parallel processing and enhanced performance
 """
 
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-GUI backend for parallel processing
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sqlite3
 import json
 import re
+import time
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import multiprocessing as mp
 import warnings
 warnings.filterwarnings('ignore')
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class TrendAnalysis:
-    """Advanced trend analysis with actionable insights for SMM"""
+    """Advanced trend analysis with actionable insights for SMM - Optimized for large datasets"""
     
-    def __init__(self, db_path='reports/enriched_instagram_data.sqlite', output_dir='reports'):
-        """Initialize with enriched database"""
+    def __init__(self, db_path='reports/enriched_instagram_data.sqlite', output_dir='reports', max_workers=None):
+        """Initialize with enriched database and parallel processing"""
         self.db_path = db_path
         self.output_dir = Path(output_dir)
         self.trend_images_dir = self.output_dir / 'trend_images'
         self.trend_images_dir.mkdir(exist_ok=True)
+        
+        # Parallel processing configuration
+        self.max_workers = max_workers or min(6, mp.cpu_count() - 1)
         
         # Setup plotting style for professional charts
         plt.style.use('default')
         sns.set_palette("Set2")
         
         # Load enriched data
+        start_time = time.time()
         self._load_enriched_data()
-        print(f"✅ Loaded {len(self.df):,} enriched comments for trend analysis")
+        load_time = time.time() - start_time
+        print(f"✅ Loaded {len(self.df):,} enriched comments for trend analysis in {load_time:.2f}s")
+        print(f"🚀 Parallel processing enabled with {self.max_workers} workers")
         
         # Initialize analysis containers
         self.weekly_sov = {}
@@ -67,47 +84,47 @@ class TrendAnalysis:
         for col in bool_columns:
             if col in self.df.columns:
                 self.df[col] = self.df[col].astype(bool)
+                self.df[col] = self.df[col].astype(bool)
                 
     def run_comprehensive_analysis(self):
-        """Run complete trend and shift analysis"""
+        """Run complete trend and shift analysis with parallel processing"""
         print("\n" + "="*80)
-        print("📈 COMPREHENSIVE TREND & SHIFT ANALYSIS")
+        print("📈 COMPREHENSIVE TREND & SHIFT ANALYSIS (PARALLELIZED)")
         print("="*80)
         
-        # 1. Weekly Share of Voice Analysis
-        self._analyze_weekly_sov()
+        start_time = time.time()
         
-        # 2. Risers/Fallers Detection
-        self._detect_risers_fallers()
+        # Run analysis steps in parallel where possible
+        print("🚀 Running parallel trend analysis...")
         
-        # 3. Question Hotspots Identification
-        self._identify_question_hotspots()
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit parallelizable tasks
+            sov_future = executor.submit(self._analyze_weekly_sov)
+            hotspots_future = executor.submit(self._identify_question_hotspots) 
+            retailer_future = executor.submit(self._analyze_retailer_heat)
+            availability_future = executor.submit(self._analyze_availability_requests)
+            usage_future = executor.submit(self._analyze_usage_questions)
+            price_future = executor.submit(self._detect_price_sensitivity)
+            
+            # Wait for completion
+            sov_future.result()
+            hotspots_future.result()
+            retailer_future.result()
+            availability_future.result()
+            usage_future.result()
+            price_future.result()
         
-        # 4. Retailer Heat Analysis
-        self._analyze_retailer_heat()
+        # Sequential steps that depend on previous results
+        self._detect_risers_fallers()  # Depends on SOV
+        self._generate_alerts()  # Depends on all analysis
+        self._extract_actionable_insights()  # Depends on all analysis
         
-        # 5. Availability & Bring-back Requests
-        self._analyze_availability_requests()
-        
-        # 6. Face-safe & Usage Questions
-        self._analyze_usage_questions()
-        
-        # 7. Price Sensitivity Detection
-        self._detect_price_sensitivity()
-        
-        # 8. Alerting System
-        self._generate_alerts()
-        
-        # 9. Actionable Insights Extraction
-        self._extract_actionable_insights()
-        
-        # 10. Generate Advanced Visualizations
+        # Generate outputs
         self._create_advanced_visualizations()
-        
-        # 11. Generate Comprehensive Report
         self._generate_trend_report()
         
-        print(f"\n🎉 Trend Analysis Complete!")
+        total_time = time.time() - start_time
+        print(f"\n🎉 Trend Analysis Complete in {total_time:.2f} seconds!")
         print(f"📊 Advanced insights and visualizations generated")
         
         return self._generate_summary()

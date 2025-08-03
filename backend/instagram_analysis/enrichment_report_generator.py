@@ -1,38 +1,55 @@
 #!/usr/bin/env python3
 """
-🔍 ENRICHMENT REPORT GENERATOR WITH VISUALIZATIONS
+🔍 ENHANCED ENRICHMENT REPORT GENERATOR WITH VISUALIZATIONS
 Generates comprehensive enrichment analysis with charts and markdown export
+Optimized for large datasets (17k+ comments) with parallel processing
 """
 
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-GUI backend for parallel processing
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sqlite3
 import json
+import time
+import logging
 from datetime import datetime
 from pathlib import Path
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing as mp
 import warnings
 warnings.filterwarnings('ignore')
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class EnrichmentReportGenerator:
-    """Generate comprehensive enrichment report with visualizations"""
+    """Generate comprehensive enrichment report with visualizations - Enhanced for large datasets"""
     
-    def __init__(self, db_path='reports/enriched_instagram_data.sqlite', output_dir='reports'):
-        """Initialize with enriched database"""
+    def __init__(self, db_path='reports/enriched_instagram_data.sqlite', output_dir='reports', max_workers=None):
+        """Initialize with enriched database and parallel processing"""
         self.db_path = db_path
         self.output_dir = Path(output_dir)
         self.images_dir = self.output_dir / 'enrichment_images'
         self.images_dir.mkdir(exist_ok=True)
+        
+        # Parallel processing configuration
+        self.max_workers = max_workers or min(4, mp.cpu_count() - 1)
         
         # Setup plotting style
         plt.style.use('default')
         sns.set_palette("husl")
         
         # Load enriched data
+        start_time = time.time()
         self._load_enriched_data()
-        print(f"✅ Loaded {len(self.df):,} enriched comments for reporting")
+        load_time = time.time() - start_time
+        print(f"✅ Loaded {len(self.df):,} enriched comments for reporting in {load_time:.2f}s")
+        print(f"🚀 Parallel report generation enabled with {self.max_workers} workers")
         
     def _load_enriched_data(self):
         """Load data from SQLite database"""
@@ -58,25 +75,40 @@ class EnrichmentReportGenerator:
                 self.df[col] = self.df[col].astype(bool)
         
     def generate_report(self):
-        """Generate complete enrichment report with visualizations"""
+        """Generate complete enrichment report with visualizations using parallel processing"""
         print("\n" + "="*80)
-        print("📊 GENERATING COMPREHENSIVE ENRICHMENT REPORT WITH VISUALIZATIONS")
+        print("📊 GENERATING ENHANCED ENRICHMENT REPORT WITH VISUALIZATIONS (PARALLELIZED)")
         print("="*80)
         
-        # Generate all visualizations
-        self._create_language_analysis()
-        self._create_sentiment_analysis()
-        self._create_intent_analysis()
-        self._create_product_analysis()
-        self._create_engagement_analysis()
-        self._create_quality_analysis()
+        start_time = time.time()
+        
+        # Generate visualizations in parallel
+        print("🚀 Generating visualizations in parallel...")
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit visualization tasks
+            futures = [
+                executor.submit(self._create_language_analysis),
+                executor.submit(self._create_sentiment_analysis),
+                executor.submit(self._create_intent_analysis),
+                executor.submit(self._create_product_analysis),
+                executor.submit(self._create_engagement_analysis),
+                executor.submit(self._create_quality_analysis)
+            ]
+            
+            # Wait for all visualizations to complete
+            for i, future in enumerate(futures, 1):
+                future.result()
+                print(f"  ✅ Visualization {i}/6 completed")
         
         # Generate markdown report
         self._generate_markdown_report()
         
-        print(f"\n🎉 Enrichment Report generated successfully!")
+        total_time = time.time() - start_time
+        print(f"\n🎉 Enhanced Enrichment Report generated in {total_time:.2f} seconds!")
         print(f"📁 Report location: {self.output_dir}/enrichment_report.md")
         print(f"🖼️ Images location: {self.images_dir}/")
+        print(f"⚡ Processing rate: {len(self.df)/total_time:.0f} comments/second")
         
     def _create_language_analysis(self):
         """Create language distribution visualizations"""
@@ -183,7 +215,11 @@ class EnrichmentReportGenerator:
         
         # Intent over time (daily)
         daily_intent = pd.crosstab(self.df['date'], self.df['intent'])
-        daily_intent[['PRAISE', 'QUESTION', 'COMPLAINT', 'PURCHASE_INTENT', 'REQUEST']].plot(ax=axes[1,0])
+        # Get available intent columns dynamically
+        available_intents = [col for col in ['PRAISE', 'QUESTION', 'COMPLAINT', 'PURCHASE', 'PURCHASE_INTENT', 'REQUEST'] 
+                            if col in daily_intent.columns]
+        if available_intents:
+            daily_intent[available_intents].plot(ax=axes[1,0])
         axes[1,0].set_title('Intent Trends Over Time')
         axes[1,0].set_xlabel('Date')
         axes[1,0].set_ylabel('Number of Comments')
@@ -540,7 +576,7 @@ This comprehensive enrichment analysis examines **{total_comments:,} Instagram c
 - Product education needs
 - FAQ development insights
 
-#### 🛒 PURCHASE_INTENT Comments ({intent_dist.get('PURCHASE_INTENT', 0):,})
+#### 🛒 PURCHASE Comments ({intent_dist.get('PURCHASE', intent_dist.get('PURCHASE_INTENT', 0)):,})
 - Direct sales opportunity indicators
 - Conversion optimization targets
 - Product demand signals
@@ -651,7 +687,7 @@ This comprehensive enrichment analysis examines **{total_comments:,} Instagram c
 ### 🎯 Strategic Recommendations
 
 #### Immediate Actions (Next 30 Days)
-1. **Leverage High-Intent Comments**: Follow up on {intent_dist.get('PURCHASE_INTENT', 0)} purchase intent signals
+1. **Leverage High-Intent Comments**: Follow up on {intent_dist.get('PURCHASE', intent_dist.get('PURCHASE_INTENT', 0))} purchase intent signals
 2. **Address Questions**: Respond to {intent_dist.get('QUESTION', 0)} customer questions for service excellence
 3. **Amplify Praise**: Showcase {intent_dist.get('PRAISE', 0)} positive comments as social proof
 4. **Product Demand**: Analyze {product_mentions} product mentions for inventory insights
@@ -669,7 +705,7 @@ This comprehensive enrichment analysis examines **{total_comments:,} Instagram c
 ### 🚀 Advanced Analytics Opportunities
 
 #### Layer 3 Implementation Ready
-- **Real-time Intent Monitoring**: Track {intent_dist.get('PURCHASE_INTENT', 0)} purchase signals live
+- **Real-time Intent Monitoring**: Track {intent_dist.get('PURCHASE', intent_dist.get('PURCHASE_INTENT', 0))} purchase signals live
 - **Sentiment Alert System**: Monitor sentiment drops below {avg_sentiment:.3f} baseline
 - **Product Demand Forecasting**: Use {product_mentions} mentions for inventory planning
 - **Crisis Prevention**: {spam_rate:.1f}% spam rate shows stable community health

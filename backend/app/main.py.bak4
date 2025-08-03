@@ -1,0 +1,242 @@
+"""
+FastAPI application for Instagram Scrollmark Analysis
+Provides REST API endpoints for social media intelligence data
+"""
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import sqlite3
+import pandas as pd
+from typing import Dict, List, Any
+import os
+from datetime import datetime, timedelta
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Instagram Scrollmark Analysis API",
+    description="Social Media Intelligence API for engagement data analysis",
+    version="1.0.0"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure based on your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database path
+DB_PATH = "reports/enriched_instagram_data.sqlite"
+
+def get_db_connection():
+    """Get database connection with error handling"""
+    if not os.path.exists(DB_PATH):
+        raise HTTPException(status_code=404, detail="Database not found. Run enrichment pipeline first.")
+    return sqlite3.connect(DB_PATH)
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"message": "Instagram Scrollmark Analysis API", "status": "running"}
+
+@app.get("/api/health")
+async def health_check():
+    """Detailed health check"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM comments_enriched")
+        count = cursor.fetchone()[0]
+        conn.close()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "total_comments": count,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/dashboard/summary")
+async def dashboard_summary():
+    """Dashboard summary with key metrics"""
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql_query("SELECT * FROM comments_enriched", conn)
+        conn.close()
+        
+        # Convert timestamp
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Basic metrics
+        total_comments = len(df)
+        unique_posts = df['media_id'].nunique()
+        
+        # Intent distribution
+        intent_counts = df['intent'].value_counts().to_dict()
+        
+        # Sentiment metrics
+        avg_sentiment = df['sentiment_score'].mean()
+        positive_ratio = (df['sentiment_score'] > 0.05).mean()
+        
+        # Recent activity (last 7 days)
+        recent_date = df['timestamp'].max() - timedelta(days=7)
+        recent_comments = len(df[df['timestamp'] >= recent_date])
+        
+        return {
+            "total_comments": total_comments,
+            "unique_posts": unique_posts,
+            "intent_distribution": intent_counts,
+            "avg_sentiment_score": round(avg_sentiment, 3),
+            "positive_sentiment_ratio": round(positive_ratio, 3),
+            "recent_activity": recent_comments,
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching dashboard data: {str(e)}")
+
+@app.get("/api/trends/week")
+async def weekly_trends():
+    """Weekly trends and share of voice data"""
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql_query("SELECT * FROM comments_enriched", conn)
+        conn.close()
+        
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['week'] = df['timestamp'].dt.to_period('W').astype(str)
+        
+        # Weekly comment counts
+        weekly_counts = df.groupby('week').size().to_dict()
+        
+        # Weekly sentiment trends
+        weekly_sentiment = df.groupby('week')['sentiment_score'].mean().round(3).to_dict()
+        
+        # Weekly intent distribution
+        weekly_intents = df.groupby(['week', 'intent']).size().unstack(fill_value=0).to_dict('index')
+        
+        return {
+            "weekly_comment_counts": weekly_counts,
+            "weekly_sentiment_trends": weekly_sentiment,
+            "weekly_intent_distribution": weekly_intents,
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching trend data: {str(e)}")
+
+@app.get("/api/alerts/latest")
+async def latest_alerts():
+    """Latest alerts and notifications"""
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql_query("SELECT * FROM comments_enriched", conn)
+        conn.close()
+        
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        alerts = []
+        
+        # Check for negative sentiment spikes (last 24 hours)
+        recent_date = df['timestamp'].max() - timedelta(days=1)
+        recent_df = df[df['timestamp'] >= recent_date]
+        
+        if len(recent_df) > 0:
+            neg_sentiment_ratio = (recent_df['sentiment_score'] < -0.1).mean()
+            if neg_sentiment_ratio > 0.3:  # More than 30% negative
+                alerts.append({
+                    "type": "negative_sentiment_spike",
+                    "severity": "high",
+                    "message": f"High negative sentiment detected: {neg_sentiment_ratio:.1%} of recent comments",
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        # Check for spam bursts
+        if 'is_spam' in df.columns:
+            spam_ratio = df[df['timestamp'] >= recent_date]['is_spam'].mean()
+            if spam_ratio > 0.2:  # More than 20% spam
+                alerts.append({
+                    "type": "spam_burst",
+                    "severity": "medium", 
+                    "message": f"Increased spam activity: {spam_ratio:.1%} of recent comments",
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        # Check for complaint clusters
+        complaint_ratio = (recent_df['intent'] == 'COMPLAINT').mean()
+        if complaint_ratio > 0.15:  # More than 15% complaints
+            alerts.append({
+                "type": "complaint_cluster",
+                "severity": "high",
+                "message": f"High complaint volume: {complaint_ratio:.1%} of recent comments",
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        return {
+            "alerts": alerts,
+            "alert_count": len(alerts),
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching alerts: {str(e)}")
+
+@app.get("/api/charts/interactive")
+async def interactive_charts():
+    """Data for interactive charts"""
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql_query("SELECT * FROM comments_enriched", conn)
+        conn.close()
+        
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['date'] = df['timestamp'].dt.date.astype(str)
+        
+        # Daily activity chart data
+        daily_activity = df.groupby('date').size().to_dict()
+        
+        # Intent distribution pie chart
+        intent_distribution = df['intent'].value_counts().to_dict()
+        
+        # Sentiment over time
+        daily_sentiment = df.groupby('date')['sentiment_score'].mean().round(3).to_dict()
+        
+        # Language distribution
+        language_dist = {}
+        if 'language' in df.columns:
+            language_dist = df['language'].value_counts().head(10).to_dict()
+        
+        return {
+            "daily_activity": {
+                "labels": list(daily_activity.keys()),
+                "data": list(daily_activity.values()),
+                "type": "line"
+            },
+            "intent_distribution": {
+                "labels": list(intent_distribution.keys()),
+                "data": list(intent_distribution.values()),
+                "type": "pie"
+            },
+            "sentiment_trends": {
+                "labels": list(daily_sentiment.keys()),
+                "data": list(daily_sentiment.values()),
+                "type": "line"
+            },
+            "language_distribution": {
+                "labels": list(language_dist.keys()),
+                "data": list(language_dist.values()),
+                "type": "bar"
+            },
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching chart data: {str(e)}")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000) 

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Scrollmark Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            height: 400px;
+            overflow: hidden;
+        }
+        
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #333;
+            text-align: center;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: calc(100% - 60px);
+            width: 100%;
+        }
+        
+        canvas {
+            max-width: 100% !important;
+            max-height: 100% !important;
+        }
+        
+        .alerts-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .alerts-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .alert-item {
+            padding: 1rem;
+            border-left: 4px solid #ff6b6b;
+            background: #fff5f5;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+        
+        .alert-high { border-left-color: #ff6b6b; background: #fff5f5; }
+        .alert-medium { border-left-color: #ffa726; background: #fff8e1; }
+        .alert-low { border-left-color: #66bb6a; background: #f1f8e9; }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            border-top: 1px solid #eee;
+            margin-top: 3rem;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 1rem;
+            transition: background 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Instagram Scrollmark Analysis</h1>
+        <p>Real-time Social Media Intelligence Dashboard</p>
+        <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh Data</button>
+    </div>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalComments">-</div>
+                <div class="stat-label">Total Comments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="uniquePosts">-</div>
+                <div class="stat-label">Unique Posts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgSentiment">-</div>
+                <div class="stat-label">Avg Sentiment</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="positiveSentiment">-</div>
+                <div class="stat-label">Positive Sentiment</div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">Daily Activity Trend</div>
+                <div class="chart-wrapper">
+                    <canvas id="activityChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Intent Distribution</div>
+                <div class="chart-wrapper">
+                    <canvas id="intentChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Sentiment Trends</div>
+                <div class="chart-wrapper">
+                    <canvas id="sentimentChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Language Distribution</div>
+                <div class="chart-wrapper">
+                    <canvas id="languageChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="alerts-section">
+            <div class="alerts-title">🚨 Active Alerts</div>
+            <div id="alertsContainer">
+                <div class="loading">Loading alerts...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🚀 Powered by Instagram Scrollmark Analysis Engine | Last updated: <span id="lastUpdated">-</span></p>
+    </div>
+
+    <script>
+        let activityChart, intentChart, sentimentChart, languageChart;
+
+        // Initialize dashboard
+        async function loadDashboard() {
+            console.log('🚀 Loading dashboard data...');
+            
+            try {
+                // Load summary stats
+                await loadSummaryStats();
+                
+                // Load charts data
+                await loadCharts();
+                
+                // Load alerts
+                await loadAlerts();
+                
+                // Update timestamp
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                
+                console.log('✅ Dashboard loaded successfully');
+            } catch (error) {
+                console.error('❌ Dashboard loading failed:', error);
+            }
+        }
+
+        // Load summary statistics
+        async function loadSummaryStats() {
+            try {
+                const response = await fetch('/api/dashboard/summary');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('totalComments').textContent = data.total_comments?.toLocaleString() || '-';
+                    document.getElementById('uniquePosts').textContent = data.unique_posts?.toLocaleString() || '-';
+                    document.getElementById('avgSentiment').textContent = data.avg_sentiment_score?.toFixed(3) || '-';
+                    document.getElementById('positiveSentiment').textContent = 
+                        data.positive_sentiment_ratio ? (data.positive_sentiment_ratio * 100).toFixed(1) + '%' : '-';
+                } else {
+                    console.error('API Error:', data.detail);
+                }
+            } catch (error) {
+                console.error('Failed to load summary stats:', error);
+            }
+        }
+
+        // Load and render charts
+        async function loadCharts() {
+            try {
+                const response = await fetch('/api/charts/interactive');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    renderActivityChart(data.daily_activity);
+                    renderIntentChart(data.intent_distribution);
+                    renderSentimentChart(data.sentiment_trends);
+                    renderLanguageChart(data.language_distribution);
+                } else {
+                    console.error('Charts API Error:', data.detail);
+                }
+            } catch (error) {
+                console.error('Failed to load charts:', error);
+            }
+        }
+
+        // Load alerts
+        async function loadAlerts() {
+            try {
+                const response = await fetch('/api/alerts/latest');
+                const data = await response.json();
+                
+                const alertsContainer = document.getElementById('alertsContainer');
+                
+                if (response.ok) {
+                    if (data.alerts && data.alerts.length > 0) {
+                        alertsContainer.innerHTML = data.alerts.map(alert => `
+                            <div class="alert-item alert-${alert.severity?.toLowerCase() || 'medium'}">
+                                <strong>${alert.type?.replace(/_/g, ' ').toUpperCase() || 'ALERT'}</strong><br>
+                                ${alert.message || 'Alert detected'}
+                                <small style="float: right; opacity: 0.7;">
+                                    ${new Date(alert.timestamp).toLocaleString()}
+                                </small>
+                            </div>
+                        `).join('');
+                    } else {
+                        alertsContainer.innerHTML = '<div style="color: #66bb6a; text-align: center; padding: 1rem;">✅ No active alerts - System healthy</div>';
+                    }
+                } else {
+                    alertsContainer.innerHTML = '<div style="color: #ff6b6b;">Failed to load alerts</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load alerts:', error);
+                document.getElementById('alertsContainer').innerHTML = '<div style="color: #ff6b6b;">Failed to load alerts</div>';
+            }
+        }
+
+        // Chart rendering functions
+        function renderActivityChart(data) {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            if (activityChart) activityChart.destroy();
+            
+            activityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        label: 'Daily Comments',
+                        data: data.data || [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                        x: { grid: { color: '#f0f0f0' } }
+                    }
+                }
+            });
+        }
+
+        function renderIntentChart(data) {
+            const ctx = document.getElementById('intentChart').getContext('2d');
+            if (intentChart) intentChart.destroy();
+            
+            intentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        data: data.data || [],
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function renderSentimentChart(data) {
+            const ctx = document.getElementById('sentimentChart').getContext('2d');
+            if (sentimentChart) sentimentChart.destroy();
+            
+            sentimentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        label: 'Sentiment Score',
+                        data: data.data || [],
+                        borderColor: '#764ba2',
+                        backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: false,
+                            grid: { color: '#f0f0f0' }
+                        },
+                        x: { grid: { color: '#f0f0f0' } }
+                    }
+                }
+            });
+        }
+
+        function renderLanguageChart(data) {
+            const ctx = document.getElementById('languageChart').getContext('2d');
+            if (languageChart) languageChart.destroy();
+            
+            languageChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        label: 'Comments',
+                        data: data.data || [],
+                        backgroundColor: '#4facfe'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                        x: { grid: { color: '#f0f0f0' } }
+                    }
+                }
+            });
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(loadDashboard, 5 * 60 * 1000);
+
+        // Load dashboard on page load
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html> 
